@@ -4,27 +4,31 @@ A minimal secret manager: CLI for schema/metadata, GUI for editing secret values
 
 ## Architecture
 
-- **CLI** (`credctl`): manage secret schemas, list/describe secrets. Never prints secret values.
+- **CLI** (`credctl`): list/describe secrets, manage contexts. Never prints secret values.
 - **Editor UI** (xilem): transient window for editing secret values. Values stay in memory only.
-- **SecretStore trait**: pluggable backend. Implementations: local file store (dev).
+- **SecretStore trait**: pluggable backend. Implementations: file store, .env store, AWS Secrets Manager.
 - **SecretEditor trait**: pluggable UI for editing values. Default: xilem window.
+- **Context system**: kubectl-style context switcher for multiple store backends.
 
 ## Key invariant
 
-**Secret values are NEVER printed to stdout/stderr, logged, or written to disk** (except by dev-store for testing). They exist only in process memory during editing and are transmitted directly to the secret store backend.
+**Secret values are NEVER printed to stdout/stderr, logged, or written to disk** (except by the file store for local dev). They exist only in process memory during editing and are transmitted directly to the secret store backend.
 
 ## Project structure
 
 ```
 src/
-  main.rs            - CLI entrypoint, async dispatch to store
-  cli.rs             - Clap derive structs + help text
+  main.rs            - CLI entrypoint, config loading, context dispatch
+  cli.rs             - Clap derive structs + help text + context subcommand
+  config.rs          - Config structs (contexts, store types), load/save
   store/
     mod.rs           - SecretValue (zeroize), SecretKind, SecretMeta, SecretStore trait
-    file.rs          - Local file store (behind dev-store feature)
+    file.rs          - Local file store (JSON files under a directory)
+    env.rs           - .env file store (one file = one structured secret)
+    aws.rs           - AWS Secrets Manager store
   ui/
     mod.rs           - SecretEditor trait (kind + optional current value -> Result<SecretValue>)
-    xilem_editor.rs  - Xilem-based editor: dark theme, plain text + JSON key-value table
+    xilem_editor.rs  - Xilem-based editor: dark theme, plain text + structured key-value table
 docs/
   requirements.md    - detailed requirements
   xilem.md           - xilem integration notes, patterns, and gotchas
@@ -34,24 +38,36 @@ docs/
 ## Build & run
 
 ```sh
-cargo build --features dev-store
-cargo run --features dev-store -- help
-cargo run --features dev-store -- create my-secret
-cargo run --features dev-store -- create db-creds --json
-cargo run --features dev-store -- schema db-creds --set '["host","port","user","password"]'
-cargo run --features dev-store -- edit db-creds
-cargo run --features dev-store -- list
+cargo build
+cargo run -- help
+cargo run -- create my-secret
+cargo run -- create db-creds --structured
+cargo run -- edit db-creds --keys host,port,user,password
+cargo run -- list
 ```
 
-## Feature flags
+## Context management
 
-- `dev-store`: enables `FileStore` — local JSON files under `.credctl/secrets/`. Dev/testing only.
+```sh
+credctl context list                                          # list all (* = current)
+credctl context set prod --store env --path .env.prod         # add env context
+credctl context set staging --store aws --profile my-profile  # add AWS context
+credctl context use prod                                      # switch
+credctl context current                                       # print current
+credctl --context staging list                                # one-off override
+```
+
+Config stored at `~/.credctl/config.json`. Default context: `env` store at `.env`.
+
+## Store backends
+
+- **env**: Single .env file = one structured secret. Default for `default` context.
+- **aws**: AWS Secrets Manager. Kind metadata stored as tags (`credctl:kind`).
+- **file**: Local JSON files in a directory. Behind `dev-store` feature flag, for development only.
 
 ## Xilem dependency
 
-Uses a **git dependency** from `github.com/backkem/xilem` branch `keep-running-after-action`.
-
-That branch carries a small patch in `xilem/src/driver.rs`: check `AppState::keep_running()` after `run_logic` in `handle_message_result`, so button callbacks can signal app exit. Without this, the event loop hangs after programmatic window close. This resolves an existing upstream TODO.
+Uses a **git dependency** from `github.com/linebender/xilem` (latest main). The `AppState::keep_running()` check that allows programmatic window close is upstream.
 
 ## Exploring the xilem API
 
@@ -72,8 +88,11 @@ Key xilem patterns in our code:
 
 - clap — CLI parsing
 - serde / serde_json — serialization
+- serde-envfile — .env file serialization
 - chrono — timestamps
 - tokio — async runtime
 - zeroize — secure memory clearing
 - anyhow — error handling
-- xilem (local path) — GUI toolkit
+- dirs — home directory resolution
+- aws-config / aws-sdk-secretsmanager — AWS Secrets Manager
+- xilem (git dep) — GUI toolkit

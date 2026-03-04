@@ -8,11 +8,15 @@ dev-store = []
 
 [dependencies]
 anyhow = "1"
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-secretsmanager = "1"
 clap = { version = "4", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde-envfile = "0.3"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 zeroize = { version = "1", features = ["derive"] }
 
-xilem = { git = "https://github.com/backkem/xilem", branch = "keep-running-after-action", package = "xilem" }
+xilem = { git = "https://github.com/linebender/xilem", package = "xilem" }

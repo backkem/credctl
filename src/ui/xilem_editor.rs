@@ -36,6 +36,7 @@ type ResultSlot = Arc<Mutex<Option<String>>>;
 struct EditorApp {
     window_id: WindowId,
     done: bool,
+    warn_unsaved_row: bool,
     result: ResultSlot,
     inner: EditorInner,
     initial_height: f64,
@@ -65,7 +66,23 @@ impl AppState for EditorApp {
 }
 
 impl EditorApp {
-    fn save(&mut self) {
+    fn has_pending_row(&self) -> bool {
+        matches!(&self.inner, EditorInner::Json(j) if !j.new_key.is_empty())
+    }
+
+    fn add_pending_row(&mut self) {
+        if let EditorInner::Json(j) = &mut self.inner {
+            if !j.new_key.is_empty() {
+                j.rows.push(KvRow {
+                    key: std::mem::take(&mut j.new_key),
+                    value: std::mem::take(&mut j.new_value),
+                    masked: true,
+                });
+            }
+        }
+    }
+
+    fn force_save(&mut self) {
         let value = match &self.inner {
             EditorInner::PlainText { content, .. } => content.clone(),
             EditorInner::Json(j) => {
@@ -82,7 +99,16 @@ impl EditorApp {
             }
         };
         *self.result.lock().unwrap() = Some(value);
+        self.warn_unsaved_row = false;
         self.done = true;
+    }
+
+    fn save(&mut self) {
+        if self.has_pending_row() {
+            self.warn_unsaved_row = true;
+            return;
+        }
+        self.force_save();
     }
 
     fn cancel(&mut self) {
@@ -106,7 +132,13 @@ fn app_logic(state: &mut EditorApp) -> Vec<WindowView<EditorApp>> {
 
     let header = header_bar();
 
-    let root = flex_col((header, body.flex(1.0))).background_color(BG_WINDOW);
+    let warning: Option<Box<xilem::AnyWidgetView<EditorApp>>> = if state.warn_unsaved_row {
+        Some(unsaved_row_warning().boxed())
+    } else {
+        None
+    };
+
+    let root = flex_col((header, warning, body.flex(1.0))).background_color(BG_WINDOW);
 
     let height = state.initial_height;
     let win = window(state.window_id, "credctl — Edit Secret", root)
@@ -144,6 +176,45 @@ fn header_bar() -> impl WidgetView<EditorApp> {
         .gap(Length::px(8.))
         .padding(12.0)
         .background_color(BG_HEADER)
+}
+
+// ── Unsaved row warning ──
+
+const WARN_BG: Color = Color::from_rgb8(0x4a, 0x3a, 0x1a);
+const WARN_TEXT: Color = Color::from_rgb8(0xff, 0xcc, 0x00);
+
+fn unsaved_row_warning() -> impl WidgetView<EditorApp> {
+    let msg = label("You have an unadded row in the new variable fields.")
+        .text_size(13.0)
+        .color(WARN_TEXT);
+
+    let add_btn = text_button("Add & Save", |s: &mut EditorApp| {
+        s.add_pending_row();
+        s.force_save();
+    })
+    .background_color(ACCENT)
+    .corner_radius(4.0);
+
+    let discard_btn = text_button("Discard & Save", |s: &mut EditorApp| {
+        if let EditorInner::Json(j) = &mut s.inner {
+            j.new_key.clear();
+            j.new_value.clear();
+        }
+        s.force_save();
+    })
+    .border(BORDER, 1.0)
+    .corner_radius(4.0);
+
+    let dismiss_btn = text_button("Go Back", |s: &mut EditorApp| {
+        s.warn_unsaved_row = false;
+    })
+    .border(BORDER, 1.0)
+    .corner_radius(4.0);
+
+    flex_row((msg.flex(1.0), add_btn, discard_btn, dismiss_btn))
+        .gap(Length::px(8.))
+        .padding(12.0)
+        .background_color(WARN_BG)
 }
 
 // ── Plain text body ──
@@ -376,7 +447,7 @@ impl XilemEditor {
                 content: current.map(|v| v.expose().to_owned()).unwrap_or_default(),
                 masked: true,
             },
-            SecretKind::Json { keys } => {
+            SecretKind::Structured { keys } => {
                 let existing: serde_json::Map<String, serde_json::Value> = current
                     .and_then(|v| serde_json::from_str(v.expose()).ok())
                     .unwrap_or_default();
@@ -420,6 +491,7 @@ impl XilemEditor {
         let state = EditorApp {
             window_id: WindowId::next(),
             done: false,
+            warn_unsaved_row: false,
             result: result.clone(),
             inner,
             initial_height,

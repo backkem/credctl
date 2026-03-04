@@ -1,44 +1,88 @@
 mod cli;
+mod config;
 mod store;
 mod ui;
+
+use std::io::{BufRead, Write};
 
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Commands};
-
-#[cfg(feature = "dev-store")]
-fn make_store() -> store::file::FileStore {
-    store::file::FileStore::new(store::file::FileStore::default_dir())
-}
+use config::StoreType;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Help => {
-            cli::print_help();
-        }
-
-        #[cfg(feature = "dev-store")]
-        _ => run_with_store(&make_store(), &ui::XilemEditor, cli.command).await?,
-
-        #[cfg(not(feature = "dev-store"))]
-        _ => {
-            anyhow::bail!("no secret store configured. Build with --features dev-store for local file store.");
-        }
+    // Suppress xilem/wgpu log noise unless the user explicitly sets RUST_LOG.
+    if std::env::var_os("RUST_LOG").is_none() {
+        // SAFETY: called before tokio spawns any threads.
+        unsafe { std::env::set_var("RUST_LOG", "error") };
     }
 
-    Ok(())
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Commands::Help => {
+            cli::print_help();
+            return Ok(());
+        }
+        Commands::Context { action } => {
+            let mut cfg = config::load_config()?;
+            config::handle_context_command(&mut cfg, action)?;
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    let cfg = config::load_config()?;
+    let (_, store_type) = config::resolve_context(&cfg, cli.context.as_deref())?;
+
+    match store_type.clone() {
+        #[cfg(feature = "dev-store")]
+        StoreType::File { path } => {
+            let dir = path.unwrap_or_else(|| ".credctl/secrets".to_string());
+            let s = store::file::FileStore::new(dir);
+            run_with_store(&s, &ui::XilemEditor, cli.command).await
+        }
+        #[cfg(not(feature = "dev-store"))]
+        StoreType::File { .. } => {
+            anyhow::bail!("file store requires building with --features dev-store")
+        }
+        StoreType::Env { path } => {
+            let p = path.unwrap_or_else(|| ".env".to_string());
+            let s = store::env::EnvStore::new(p);
+            run_with_store(&s, &ui::XilemEditor, cli.command).await
+        }
+        StoreType::Aws { profile } => {
+            let s = store::aws::AwsStore::new(profile).await?;
+            run_with_store(&s, &ui::XilemEditor, cli.command).await
+        }
+    }
 }
 
-#[cfg(feature = "dev-store")]
+/// If the value is a JSON object with all-string values, treat it as structured.
+fn detect_kind(value: &str) -> store::SecretKind {
+    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(value) {
+        if map.values().all(|v| v.is_string()) {
+            let mut keys: Vec<String> = map.keys().cloned().collect();
+            keys.sort();
+            return store::SecretKind::Structured { keys };
+        }
+    }
+    store::SecretKind::PlainText
+}
+
 async fn run_with_store(
     store: &impl store::SecretStore,
     editor: &impl ui::SecretEditor,
     cmd: Commands,
 ) -> Result<()> {
     use store::SecretKind;
+
+    // Resolve optional name against store's default (for single-secret stores like env).
+    let resolve = |name: Option<String>| -> Result<String> {
+        name.or_else(|| store.default_name())
+            .ok_or_else(|| anyhow::anyhow!("secret name is required for this store"))
+    };
 
     match cmd {
         Commands::List => {
@@ -47,22 +91,41 @@ async fn run_with_store(
                 println!("no secrets");
             } else {
                 for m in &metas {
-                    println!("{:<30} {}", m.name, m.kind);
+                    println!("{}", m.name);
                 }
             }
         }
 
         Commands::Describe { name } => {
+            let name = resolve(name)?;
             let meta = store.describe(&name).await?;
+            let kind = match &meta.kind {
+                SecretKind::PlainText => {
+                    let val = store.get_value(&name).await?;
+                    detect_kind(val.expose())
+                }
+                other => other.clone(),
+            };
             println!("name:       {}", meta.name);
-            println!("kind:       {}", meta.kind);
+            match &kind {
+                SecretKind::PlainText => println!("kind:       plain-text"),
+                SecretKind::Structured { keys } => {
+                    println!("kind:       structured");
+                    if keys.is_empty() {
+                        println!("keys:       (none)");
+                    } else {
+                        println!("keys:       {}", keys.join(", "));
+                    }
+                }
+            }
             println!("created_at: {}", meta.created_at);
             println!("updated_at: {}", meta.updated_at);
         }
 
-        Commands::Create { name, json } => {
-            let kind = if json {
-                SecretKind::Json { keys: vec![] }
+        Commands::Create { name, structured } => {
+            let name = resolve(name)?;
+            let kind = if structured {
+                SecretKind::Structured { keys: vec![] }
             } else {
                 SecretKind::PlainText
             };
@@ -78,10 +141,31 @@ async fn run_with_store(
             }
         }
 
-        Commands::Edit { name } => {
+        Commands::Edit { name, keys } => {
+            let name = resolve(name)?;
             let meta = store.describe(&name).await?;
             let current = store.get_value(&name).await?;
-            match editor.edit(&meta.kind, Some(current)) {
+            // Auto-detect structured secrets: if marked PlainText but the value
+            // is a JSON object with string values, open as structured instead.
+            let mut kind = match &meta.kind {
+                SecretKind::PlainText => detect_kind(current.expose()),
+                other => other.clone(),
+            };
+            // --keys forces structured mode and merges extra keys.
+            if !keys.is_empty() {
+                let existing = match &kind {
+                    SecretKind::Structured { keys } => keys.clone(),
+                    SecretKind::PlainText => vec![],
+                };
+                let mut merged = existing;
+                for k in keys {
+                    if !merged.contains(&k) {
+                        merged.push(k);
+                    }
+                }
+                kind = SecretKind::Structured { keys: merged };
+            }
+            match editor.edit(&kind, Some(current)) {
                 Ok(value) => {
                     store.put_value(&name, &value).await?;
                     println!("updated secret '{}'", name);
@@ -94,36 +178,19 @@ async fn run_with_store(
         }
 
         Commands::Delete { name } => {
+            let name = resolve(name)?;
+            print!("Type '{}' to confirm deletion: ", name);
+            std::io::stdout().flush()?;
+            let line = std::io::stdin().lock().lines().next()
+                .unwrap_or_else(|| Ok(String::new()))?;
+            if line.trim() != name {
+                anyhow::bail!("confirmation did not match, aborting");
+            }
             store.delete(&name).await?;
             println!("deleted secret '{}'", name);
         }
 
-        Commands::Schema { name, set } => {
-            if let Some(json_str) = set {
-                let keys: Vec<String> = serde_json::from_str(&json_str)
-                    .map_err(|e| anyhow::anyhow!("invalid JSON array: {}", e))?;
-                store
-                    .set_schema(&name, SecretKind::Json { keys })
-                    .await?;
-                println!("updated schema for '{}'", name);
-            } else {
-                let meta = store.describe(&name).await?;
-                match &meta.kind {
-                    SecretKind::PlainText => println!("plain-text (no schema)"),
-                    SecretKind::Json { keys } => {
-                        if keys.is_empty() {
-                            println!("json (no keys defined)");
-                        } else {
-                            for k in keys {
-                                println!("  - {}", k);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Commands::Help => unreachable!(),
+        Commands::Help | Commands::Context { .. } => unreachable!(),
     }
 
     Ok(())

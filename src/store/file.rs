@@ -23,10 +23,6 @@ impl FileStore {
         }
     }
 
-    pub fn default_dir() -> PathBuf {
-        PathBuf::from(".credctl/secrets")
-    }
-
     fn secret_path(&self, name: &str) -> PathBuf {
         self.base_dir.join(format!("{name}.json"))
     }
@@ -111,10 +107,4 @@ impl SecretStore for FileStore {
         Ok(())
     }
 
-    async fn set_schema(&self, name: &str, kind: SecretKind) -> anyhow::Result<()> {
-        let mut sf = self.read_file(name)?;
-        sf.meta.kind = kind;
-        sf.meta.updated_at = Utc::now();
-        self.write_file(&sf)
-    }
 }

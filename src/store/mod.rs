@@ -38,14 +38,15 @@ impl std::fmt::Debug for SecretValue {
 #[serde(tag = "type")]
 pub enum SecretKind {
     PlainText,
-    Json { keys: Vec<String> },
+    #[serde(alias = "Json")]
+    Structured { keys: Vec<String> },
 }
 
 impl std::fmt::Display for SecretKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SecretKind::PlainText => write!(f, "plain-text"),
-            SecretKind::Json { keys } => write!(f, "json({})", keys.join(", ")),
+            SecretKind::Structured { keys } => write!(f, "structured({})", keys.join(", ")),
         }
     }
 }
@@ -61,14 +62,17 @@ pub struct SecretMeta {
 // -- SecretStore trait --
 
 pub trait SecretStore {
+    /// If the store manages a single implicit secret, return its name.
+    fn default_name(&self) -> Option<String> { None }
     fn list(&self) -> impl std::future::Future<Output = Result<Vec<SecretMeta>>> + Send;
     fn describe(&self, name: &str) -> impl std::future::Future<Output = Result<SecretMeta>> + Send;
     fn get_value(&self, name: &str) -> impl std::future::Future<Output = Result<SecretValue>> + Send;
     fn put_value(&self, name: &str, value: &SecretValue) -> impl std::future::Future<Output = Result<()>> + Send;
     fn create(&self, name: &str, kind: SecretKind, value: &SecretValue) -> impl std::future::Future<Output = Result<()>> + Send;
     fn delete(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
-    fn set_schema(&self, name: &str, kind: SecretKind) -> impl std::future::Future<Output = Result<()>> + Send;
 }
 
+pub mod aws;
+pub mod env;
 #[cfg(feature = "dev-store")]
 pub mod file;
