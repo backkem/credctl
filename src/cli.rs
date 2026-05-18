@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 
 #[derive(Parser)]
@@ -12,8 +12,18 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub context: Option<String>,
 
+    /// Editor UI to use (default: gui). Requires --features tui for the tui option.
+    #[arg(long, global = true, value_enum, default_value_t = EditorKind::Gui)]
+    pub editor: EditorKind,
+
     #[command(subcommand)]
     pub command: Commands,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
+pub enum EditorKind {
+    Gui,
+    Tui,
 }
 
 #[derive(Subcommand)]
@@ -127,6 +137,7 @@ COMMANDS:
 
 GLOBAL FLAGS:
   --context <name>              Override the active context for this invocation
+  --editor <gui|tui>            Editor UI (default: gui; tui requires --features tui)
 
 EXAMPLES:
   credctl create my-secret

@@ -42,7 +42,7 @@ impl AwsStore {
     }
 
     fn aws_ts_to_chrono(ts: &aws_sdk_secretsmanager::primitives::DateTime) -> DateTime<Utc> {
-        DateTime::from_timestamp(ts.secs(), ts.subsec_nanos() as u32).unwrap_or_else(Utc::now)
+        DateTime::from_timestamp(ts.secs(), ts.subsec_nanos()).unwrap_or_else(Utc::now)
     }
 
     fn kind_tag_value(kind: &SecretKind) -> &'static str {

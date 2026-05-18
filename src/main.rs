@@ -1,3 +1,6 @@
+#[cfg(not(any(feature = "gui", feature = "tui")))]
+compile_error!("credctl requires at least one editor feature: `gui` and/or `tui`");
+
 mod cli;
 mod config;
 mod store;
@@ -8,12 +11,13 @@ use std::io::{BufRead, Write};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use clap_complete::generate;
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, EditorKind};
 use config::StoreType;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Suppress xilem/wgpu log noise unless the user explicitly sets RUST_LOG.
+    #[cfg(feature = "gui")]
     if std::env::var_os("RUST_LOG").is_none() {
         // SAFETY: called before tokio spawns any threads.
         unsafe { std::env::set_var("RUST_LOG", "error") };
@@ -48,7 +52,7 @@ async fn main() -> Result<()> {
         StoreType::File { path } => {
             let dir = path.unwrap_or_else(|| ".credctl/secrets".to_string());
             let s = store::file::FileStore::new(dir);
-            run_with_store(&s, &ui::XilemEditor, cli.command).await
+            dispatch_editor(&s, cli.editor, cli.command).await
         }
         #[cfg(not(feature = "dev-store"))]
         StoreType::File { .. } => {
@@ -57,23 +61,44 @@ async fn main() -> Result<()> {
         StoreType::Env { path } => {
             let p = path.unwrap_or_else(|| ".env".to_string());
             let s = store::env::EnvStore::new(p);
-            run_with_store(&s, &ui::XilemEditor, cli.command).await
+            dispatch_editor(&s, cli.editor, cli.command).await
         }
         StoreType::Aws { profile } => {
             let s = store::aws::AwsStore::new(profile).await?;
-            run_with_store(&s, &ui::XilemEditor, cli.command).await
+            dispatch_editor(&s, cli.editor, cli.command).await
+        }
+    }
+}
+
+async fn dispatch_editor(
+    store: &impl store::SecretStore,
+    editor: EditorKind,
+    cmd: Commands,
+) -> Result<()> {
+    match editor {
+        #[cfg(feature = "gui")]
+        EditorKind::Gui => run_with_store(store, &ui::XilemEditor, cmd).await,
+        #[cfg(not(feature = "gui"))]
+        EditorKind::Gui => {
+            anyhow::bail!("gui editor requires building with --features gui")
+        }
+        #[cfg(feature = "tui")]
+        EditorKind::Tui => run_with_store(store, &ui::TuiEditor, cmd).await,
+        #[cfg(not(feature = "tui"))]
+        EditorKind::Tui => {
+            anyhow::bail!("tui editor requires building with --features tui")
         }
     }
 }
 
 /// If the value is a JSON object with all-string values, treat it as structured.
 fn detect_kind(value: &str) -> store::SecretKind {
-    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(value) {
-        if map.values().all(|v| v.is_string()) {
-            let mut keys: Vec<String> = map.keys().cloned().collect();
-            keys.sort();
-            return store::SecretKind::Structured { keys };
-        }
+    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(value)
+        && map.values().all(|v| v.is_string())
+    {
+        let mut keys: Vec<String> = map.keys().cloned().collect();
+        keys.sort();
+        return store::SecretKind::Structured { keys };
     }
     store::SecretKind::PlainText
 }
