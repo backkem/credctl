@@ -42,8 +42,7 @@ impl AwsStore {
     }
 
     fn aws_ts_to_chrono(ts: &aws_sdk_secretsmanager::primitives::DateTime) -> DateTime<Utc> {
-        DateTime::from_timestamp(ts.secs(), ts.subsec_nanos() as u32)
-            .unwrap_or_else(Utc::now)
+        DateTime::from_timestamp(ts.secs(), ts.subsec_nanos() as u32).unwrap_or_else(Utc::now)
     }
 
     fn kind_tag_value(kind: &SecretKind) -> &'static str {
@@ -80,10 +79,12 @@ impl SecretStore for AwsStore {
                 let tags = entry.tags();
                 let kind = self.parse_tags(tags);
 
-                let created_at = entry.created_date()
+                let created_at = entry
+                    .created_date()
                     .map(Self::aws_ts_to_chrono)
                     .unwrap_or_else(Utc::now);
-                let updated_at = entry.last_changed_date()
+                let updated_at = entry
+                    .last_changed_date()
                     .map(Self::aws_ts_to_chrono)
                     .unwrap_or(created_at);
 
@@ -106,7 +107,9 @@ impl SecretStore for AwsStore {
     }
 
     async fn describe(&self, name: &str) -> anyhow::Result<SecretMeta> {
-        let resp = self.client.describe_secret()
+        let resp = self
+            .client
+            .describe_secret()
             .secret_id(name)
             .send()
             .await
@@ -115,10 +118,12 @@ impl SecretStore for AwsStore {
         let tags = resp.tags();
         let kind = self.parse_tags(tags);
 
-        let created_at = resp.created_date()
+        let created_at = resp
+            .created_date()
             .map(Self::aws_ts_to_chrono)
             .unwrap_or_else(Utc::now);
-        let updated_at = resp.last_changed_date()
+        let updated_at = resp
+            .last_changed_date()
             .map(Self::aws_ts_to_chrono)
             .unwrap_or(created_at);
 
@@ -131,11 +136,7 @@ impl SecretStore for AwsStore {
     }
 
     async fn get_value(&self, name: &str) -> anyhow::Result<SecretValue> {
-        let resp = match self.client.get_secret_value()
-            .secret_id(name)
-            .send()
-            .await
-        {
+        let resp = match self.client.get_secret_value().secret_id(name).send().await {
             Ok(r) => r,
             Err(e) => {
                 // Secret exists but has no value version yet — treat as empty.
@@ -144,18 +145,24 @@ impl SecretStore for AwsStore {
                 {
                     return Ok(SecretValue::new(String::new()));
                 }
-                return Err(e).with_context(|| format!("failed to get value for secret '{}'", name));
+                return Err(e)
+                    .with_context(|| format!("failed to get value for secret '{}'", name));
             }
         };
 
-        let value = resp.secret_string()
-            .ok_or_else(|| anyhow::anyhow!("secret '{}' has no string value (binary secrets not supported)", name))?;
+        let value = resp.secret_string().ok_or_else(|| {
+            anyhow::anyhow!(
+                "secret '{}' has no string value (binary secrets not supported)",
+                name
+            )
+        })?;
 
         Ok(SecretValue::new(value.to_string()))
     }
 
     async fn put_value(&self, name: &str, value: &SecretValue) -> anyhow::Result<()> {
-        self.client.put_secret_value()
+        self.client
+            .put_secret_value()
             .secret_id(name)
             .secret_string(value.expose())
             .send()
@@ -164,8 +171,15 @@ impl SecretStore for AwsStore {
         Ok(())
     }
 
-    async fn create(&self, name: &str, kind: SecretKind, value: &SecretValue) -> anyhow::Result<()> {
-        let mut req = self.client.create_secret()
+    async fn create(
+        &self,
+        name: &str,
+        kind: SecretKind,
+        value: &SecretValue,
+    ) -> anyhow::Result<()> {
+        let mut req = self
+            .client
+            .create_secret()
             .name(name)
             .secret_string(value.expose());
 
@@ -185,13 +199,15 @@ impl SecretStore for AwsStore {
             );
         }
 
-        req.send().await
+        req.send()
+            .await
             .with_context(|| format!("failed to create secret '{}'", name))?;
         Ok(())
     }
 
     async fn delete(&self, name: &str) -> anyhow::Result<()> {
-        self.client.delete_secret()
+        self.client
+            .delete_secret()
             .secret_id(name)
             .force_delete_without_recovery(true)
             .send()
@@ -199,5 +215,4 @@ impl SecretStore for AwsStore {
             .with_context(|| format!("failed to delete secret '{}'", name))?;
         Ok(())
     }
-
 }

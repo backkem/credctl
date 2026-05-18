@@ -1,16 +1,14 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use xilem::core::one_of::Either;
 use xilem::masonry::layout::Length;
 use xilem::masonry::parley::FontWeight;
 use xilem::masonry::peniko::Color;
 use xilem::style::Style as _;
-use xilem::core::one_of::Either;
 use xilem::view::{FlexExt, flex_col, flex_row, label, portal, sized_box, text_button, text_input};
 use xilem::winit::dpi::LogicalSize;
-use xilem::{
-    AppState, EventLoop, WidgetView, WindowId, WindowOptions, WindowView, Xilem, window,
-};
+use xilem::{AppState, EventLoop, WidgetView, WindowId, WindowOptions, WindowView, Xilem, window};
 
 use crate::store::{SecretKind, SecretValue};
 
@@ -273,9 +271,7 @@ fn plain_text_body(content: String, masked: bool) -> impl WidgetView<EditorApp> 
     ))
     .gap(Length::px(8.));
 
-    flex_col((header, editor))
-        .gap(Length::px(6.))
-        .padding(16.0)
+    flex_col((header, editor)).gap(Length::px(6.)).padding(16.0)
 }
 
 // ── JSON body ──

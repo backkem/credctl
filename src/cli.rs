@@ -139,6 +139,6 @@ EXAMPLES:
 
 SHELL COMPLETIONS:
   bash:  credctl completions bash | sudo tee /etc/bash_completion.d/credctl
-  zsh:   credctl completions zsh > \"${fpath[1]}/_credctl\""
+  zsh:   credctl completions zsh > \"${{fpath[1]}}/_credctl\""
     );
 }
