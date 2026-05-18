@@ -1,7 +1,12 @@
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 
 #[derive(Parser)]
-#[command(name = "credctl", about = "Minimal secret manager", disable_help_subcommand = true)]
+#[command(
+    name = "credctl",
+    about = "Minimal secret manager",
+    disable_help_subcommand = true
+)]
 pub struct Cli {
     /// Override the active context for this invocation
     #[arg(long, global = true)]
@@ -50,6 +55,13 @@ pub enum Commands {
     Context {
         #[command(subcommand)]
         action: ContextAction,
+    },
+
+    /// Print shell completion script for the given shell (bash, zsh, fish, ...)
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
     },
 
     /// Show help with all commands and examples
@@ -110,6 +122,7 @@ COMMANDS:
   context set <name> --store <type> [--path <p>] [--profile <p>]
                                 Create or update a context
   context delete <name>         Delete a context
+  completions <shell>           Print shell completion script (bash, zsh, fish, ...)
   help                          Show this help text
 
 GLOBAL FLAGS:
@@ -122,6 +135,10 @@ EXAMPLES:
   credctl list
   credctl --context prod list
   credctl context set prod --store env --path .env.prod
-  credctl context use prod"
+  credctl context use prod
+
+SHELL COMPLETIONS:
+  bash:  credctl completions bash | sudo tee /etc/bash_completion.d/credctl
+  zsh:   credctl completions zsh > \"${fpath[1]}/_credctl\""
     );
 }

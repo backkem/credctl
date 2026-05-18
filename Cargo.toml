@@ -11,6 +11,7 @@ anyhow = "1"
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1"
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4.6"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 serde = { version = "1", features = ["derive"] }
