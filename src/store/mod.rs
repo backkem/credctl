@@ -39,7 +39,9 @@ impl std::fmt::Debug for SecretValue {
 pub enum SecretKind {
     PlainText,
     #[serde(alias = "Json")]
-    Structured { keys: Vec<String> },
+    Structured {
+        keys: Vec<String>,
+    },
 }
 
 impl std::fmt::Display for SecretKind {
@@ -63,12 +65,26 @@ pub struct SecretMeta {
 
 pub trait SecretStore {
     /// If the store manages a single implicit secret, return its name.
-    fn default_name(&self) -> Option<String> { None }
+    fn default_name(&self) -> Option<String> {
+        None
+    }
     fn list(&self) -> impl std::future::Future<Output = Result<Vec<SecretMeta>>> + Send;
     fn describe(&self, name: &str) -> impl std::future::Future<Output = Result<SecretMeta>> + Send;
-    fn get_value(&self, name: &str) -> impl std::future::Future<Output = Result<SecretValue>> + Send;
-    fn put_value(&self, name: &str, value: &SecretValue) -> impl std::future::Future<Output = Result<()>> + Send;
-    fn create(&self, name: &str, kind: SecretKind, value: &SecretValue) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn get_value(
+        &self,
+        name: &str,
+    ) -> impl std::future::Future<Output = Result<SecretValue>> + Send;
+    fn put_value(
+        &self,
+        name: &str,
+        value: &SecretValue,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn create(
+        &self,
+        name: &str,
+        kind: SecretKind,
+        value: &SecretValue,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
     fn delete(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
 }
 

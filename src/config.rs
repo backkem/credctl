@@ -83,14 +83,22 @@ pub fn save_config(config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub fn resolve_context<'a>(config: &'a Config, override_name: Option<&'a str>) -> Result<(&'a str, &'a StoreType)> {
+pub fn resolve_context<'a>(
+    config: &'a Config,
+    override_name: Option<&'a str>,
+) -> Result<(&'a str, &'a StoreType)> {
     let name = override_name.unwrap_or(&config.current_context);
-    let store_type = config.contexts.get(name)
+    let store_type = config
+        .contexts
+        .get(name)
         .ok_or_else(|| anyhow::anyhow!("context '{}' not found", name))?;
     Ok((name, store_type))
 }
 
-pub fn handle_context_command(config: &mut Config, action: &crate::cli::ContextAction) -> Result<()> {
+pub fn handle_context_command(
+    config: &mut Config,
+    action: &crate::cli::ContextAction,
+) -> Result<()> {
     match action {
         crate::cli::ContextAction::List => {
             if config.contexts.is_empty() {
@@ -99,7 +107,11 @@ pub fn handle_context_command(config: &mut Config, action: &crate::cli::ContextA
                 let mut names: Vec<_> = config.contexts.keys().collect();
                 names.sort();
                 for name in names {
-                    let marker = if name == &config.current_context { " *" } else { "" };
+                    let marker = if name == &config.current_context {
+                        " *"
+                    } else {
+                        ""
+                    };
                     let store = &config.contexts[name];
                     println!("{:<20} {}{}", name, store, marker);
                 }
@@ -119,11 +131,18 @@ pub fn handle_context_command(config: &mut Config, action: &crate::cli::ContextA
             println!("switched to context '{}'", name);
         }
 
-        crate::cli::ContextAction::Set { name, store, path, profile } => {
+        crate::cli::ContextAction::Set {
+            name,
+            store,
+            path,
+            profile,
+        } => {
             let store_type = match store.as_str() {
                 "file" => StoreType::File { path: path.clone() },
                 "env" => StoreType::Env { path: path.clone() },
-                "aws" => StoreType::Aws { profile: profile.clone() },
+                "aws" => StoreType::Aws {
+                    profile: profile.clone(),
+                },
                 other => bail!("unknown store type '{}' (expected: file, env, aws)", other),
             };
             config.contexts.insert(name.clone(), store_type);
@@ -133,7 +152,10 @@ pub fn handle_context_command(config: &mut Config, action: &crate::cli::ContextA
 
         crate::cli::ContextAction::Delete { name } => {
             if name == &config.current_context {
-                bail!("cannot delete the current context '{}'. Switch first.", name);
+                bail!(
+                    "cannot delete the current context '{}'. Switch first.",
+                    name
+                );
             }
             if config.contexts.remove(name).is_none() {
                 bail!("context '{}' not found", name);

@@ -31,7 +31,8 @@ impl FileStore {
         let path = self.secret_path(name);
         let data = std::fs::read_to_string(&path)
             .with_context(|| format!("secret '{}' not found", name))?;
-        serde_json::from_str(&data).with_context(|| format!("corrupt secret file: {}", path.display()))
+        serde_json::from_str(&data)
+            .with_context(|| format!("corrupt secret file: {}", path.display()))
     }
 
     fn write_file(&self, sf: &SecretFile) -> anyhow::Result<()> {
@@ -80,7 +81,12 @@ impl SecretStore for FileStore {
         self.write_file(&sf)
     }
 
-    async fn create(&self, name: &str, kind: SecretKind, value: &SecretValue) -> anyhow::Result<()> {
+    async fn create(
+        &self,
+        name: &str,
+        kind: SecretKind,
+        value: &SecretValue,
+    ) -> anyhow::Result<()> {
         let path = self.secret_path(name);
         if path.exists() {
             bail!("secret '{}' already exists", name);
@@ -106,5 +112,4 @@ impl SecretStore for FileStore {
         std::fs::remove_file(&path)?;
         Ok(())
     }
-
 }

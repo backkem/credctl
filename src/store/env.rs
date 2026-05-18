@@ -28,7 +28,8 @@ impl EnvStore {
             .ok()
             .and_then(|t| {
                 let dur = t.duration_since(std::time::UNIX_EPOCH).ok()?;
-                Utc.timestamp_opt(dur.as_secs() as i64, dur.subsec_nanos()).single()
+                Utc.timestamp_opt(dur.as_secs() as i64, dur.subsec_nanos())
+                    .single()
             })
             .unwrap_or_else(Utc::now)
     }
@@ -75,7 +76,11 @@ impl SecretStore for EnvStore {
         }
         let expected = self.secret_name();
         if name != expected {
-            bail!("secret '{}' not found (this env store manages '{}')", name, expected);
+            bail!(
+                "secret '{}' not found (this env store manages '{}')",
+                name,
+                expected
+            );
         }
         let map = self.parse_env()?;
         Ok(self.meta_from_map(&map))
@@ -84,7 +89,11 @@ impl SecretStore for EnvStore {
     async fn get_value(&self, name: &str) -> anyhow::Result<SecretValue> {
         let expected = self.secret_name();
         if name != expected {
-            bail!("secret '{}' not found (this env store manages '{}')", name, expected);
+            bail!(
+                "secret '{}' not found (this env store manages '{}')",
+                name,
+                expected
+            );
         }
         let map = self.parse_env()?;
         let json = serde_json::to_string(&map)?;
@@ -94,17 +103,26 @@ impl SecretStore for EnvStore {
     async fn put_value(&self, name: &str, value: &SecretValue) -> anyhow::Result<()> {
         let expected = self.secret_name();
         if name != expected {
-            bail!("secret '{}' not found (this env store manages '{}')", name, expected);
+            bail!(
+                "secret '{}' not found (this env store manages '{}')",
+                name,
+                expected
+            );
         }
         let map: HashMap<String, String> = serde_json::from_str(value.expose())
             .context("value must be a JSON object with string values")?;
-        let env_str: String = serde_envfile::to_string(&map)
-            .context("failed to serialize to env format")?;
+        let env_str: String =
+            serde_envfile::to_string(&map).context("failed to serialize to env format")?;
         std::fs::write(&self.path, env_str)?;
         Ok(())
     }
 
-    async fn create(&self, name: &str, _kind: SecretKind, value: &SecretValue) -> anyhow::Result<()> {
+    async fn create(
+        &self,
+        name: &str,
+        _kind: SecretKind,
+        value: &SecretValue,
+    ) -> anyhow::Result<()> {
         if self.path.exists() {
             bail!("env file '{}' already exists", self.path.display());
         }
@@ -113,10 +131,9 @@ impl SecretStore for EnvStore {
             bail!("env store name is '{}', cannot create '{}'", expected, name);
         }
         // Write the initial value
-        let map: HashMap<String, String> = serde_json::from_str(value.expose())
-            .unwrap_or_default();
-        let env_str: String = serde_envfile::to_string(&map)
-            .context("failed to serialize to env format")?;
+        let map: HashMap<String, String> = serde_json::from_str(value.expose()).unwrap_or_default();
+        let env_str: String =
+            serde_envfile::to_string(&map).context("failed to serialize to env format")?;
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -127,7 +144,11 @@ impl SecretStore for EnvStore {
     async fn delete(&self, name: &str) -> anyhow::Result<()> {
         let expected = self.secret_name();
         if name != expected {
-            bail!("secret '{}' not found (this env store manages '{}')", name, expected);
+            bail!(
+                "secret '{}' not found (this env store manages '{}')",
+                name,
+                expected
+            );
         }
         if !self.path.exists() {
             bail!("env file '{}' not found", self.path.display());
@@ -135,5 +156,4 @@ impl SecretStore for EnvStore {
         std::fs::remove_file(&self.path)?;
         Ok(())
     }
-
 }

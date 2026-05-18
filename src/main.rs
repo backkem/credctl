@@ -6,7 +6,8 @@ mod ui;
 use std::io::{BufRead, Write};
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_complete::generate;
 use cli::{Cli, Commands};
 use config::StoreType;
 
@@ -23,6 +24,12 @@ async fn main() -> Result<()> {
     match &cli.command {
         Commands::Help => {
             cli::print_help();
+            return Ok(());
+        }
+        Commands::Completions { shell } => {
+            let mut cmd = Cli::command();
+            let name = cmd.get_name().to_string();
+            generate(*shell, &mut cmd, name, &mut std::io::stdout());
             return Ok(());
         }
         Commands::Context { action } => {
@@ -181,7 +188,10 @@ async fn run_with_store(
             let name = resolve(name)?;
             print!("Type '{}' to confirm deletion: ", name);
             std::io::stdout().flush()?;
-            let line = std::io::stdin().lock().lines().next()
+            let line = std::io::stdin()
+                .lock()
+                .lines()
+                .next()
                 .unwrap_or_else(|| Ok(String::new()))?;
             if line.trim() != name {
                 anyhow::bail!("confirmation did not match, aborting");
@@ -190,7 +200,7 @@ async fn run_with_store(
             println!("deleted secret '{}'", name);
         }
 
-        Commands::Help | Commands::Context { .. } => unreachable!(),
+        Commands::Help | Commands::Context { .. } | Commands::Completions { .. } => unreachable!(),
     }
 
     Ok(())
