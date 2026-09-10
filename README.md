@@ -23,6 +23,19 @@ This makes `credctl` safe to hand to an autonomous agent: the CLI is fully scrip
 cargo install --path .
 ```
 
+Prebuilt binaries for Windows, Linux and macOS are attached to each
+[GitHub release](https://github.com/backkem/credctl/releases). Every release
+ships a `SHA256SUMS` file and a signed SLSA build provenance attestation.
+To verify a download:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+gh attestation verify credctl-v0.1.0-x86_64-unknown-linux-gnu.tar.gz --repo backkem/credctl
+```
+
+The second command proves the archive was built by this repository's release
+workflow from the tagged commit, not by someone with a stolen token.
+
 ### The Basics
 
 ```bash

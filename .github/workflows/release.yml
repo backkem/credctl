@@ -1,0 +1,109 @@
+name: Release
+
+# Runs only when a v* tag is pushed. Who may push such tags is enforced by a
+# repository ruleset, not by this file.
+on:
+  push:
+    tags: ["v*"]
+
+# Deny everything by default; each job asks for exactly what it needs.
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            ext: .exe
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            ext: ""
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            ext: ""
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            ext: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      # cmake is needed by aws-lc-sys (pulled in via the AWS SDK).
+      - name: Install build deps (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake
+
+      # --locked: Cargo.lock is authoritative. Any drift (including the xilem
+      # git commit) fails the build instead of silently resolving something new.
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+          EXT: ${{ matrix.ext }}
+        run: |
+          set -euo pipefail
+          dir="credctl-${TAG}-${TARGET}"
+          mkdir "$dir"
+          cp "target/${TARGET}/release/credctl${EXT}" "$dir/credctl${EXT}"
+          cp README.md "$dir/"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            7z a "${dir}.zip" "$dir"
+          else
+            tar czf "${dir}.tar.gz" "$dir"
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.target }}
+          path: credctl-*.*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # create the release and upload assets
+      id-token: write      # OIDC token for Sigstore provenance signing
+      attestations: write  # store the attestation on the repo
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Checksums
+        run: sha256sum credctl-*.* > SHA256SUMS
+
+      # SLSA build provenance, signed via GitHub OIDC. Verify with:
+      #   gh attestation verify <file> --repo backkem/credctl
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            credctl-*.*
+            SHA256SUMS
+
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          generate_release_notes: true
+          files: |
+            credctl-*.*
+            SHA256SUMS
