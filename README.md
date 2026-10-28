@@ -98,6 +98,31 @@ Whenever you run `create` or `edit`, `credctl` launches a lightweight, native wi
 
 _(Your terminal stays completely clean the entire time)._
 
+### Terminal Editor (TUI)
+
+For headless machines, SSH sessions, or anywhere a native window isn't available, `credctl` can be built with a terminal editor instead of (or alongside) the GUI. The TUI-only build skips xilem and its system dependencies (fontconfig, wgpu).
+
+```bash
+cargo install --path . --no-default-features --features tui        # TUI only
+cargo install --path . --features tui                              # GUI + TUI
+```
+
+A TUI-only build uses the terminal editor automatically. When both are compiled in, the GUI is the default; pick the TUI with `--editor`:
+
+```bash
+credctl --editor tui edit db-creds
+```
+
+The editor runs in the terminal's alternate screen, so nothing is left in your scrollback after it closes.
+
+| Mode       | Keys                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| Plain text | type to edit · `Tab` show/hide value                                                     |
+| Structured | `j`/`k` move · `e`/`Enter` edit value · `r` rename key · `a` add · `d` delete · `m` mask |
+| Both       | `Ctrl+S` save · `Esc` cancel                                                             |
+| Editing    | `Enter`/`Esc` finish editing the field                                                   |
+| Anytime    | `Ctrl+C` cancel                                                                          |
+
 ## 🤖 Agent Skill
 
 `credctl` ships an [agent skill](https://agentskills.io/) in `SKILL.md`. Install it in your coding agent and it will automatically route secret operations through `credctl`, keeping values out of the agent's context entirely.
