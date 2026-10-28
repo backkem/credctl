@@ -12,8 +12,8 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub context: Option<String>,
 
-    /// Editor UI to use (default: gui). Requires --features tui for the tui option.
-    #[arg(long, global = true, value_enum, default_value_t = EditorKind::Gui)]
+    /// Editor UI to use (default: gui if compiled in, else tui).
+    #[arg(long, global = true, value_enum, default_value_t = EditorKind::default())]
     pub editor: EditorKind,
 
     #[command(subcommand)]
@@ -24,6 +24,16 @@ pub struct Cli {
 pub enum EditorKind {
     Gui,
     Tui,
+}
+
+impl Default for EditorKind {
+    fn default() -> Self {
+        if cfg!(feature = "gui") {
+            EditorKind::Gui
+        } else {
+            EditorKind::Tui
+        }
+    }
 }
 
 #[derive(Subcommand)]
