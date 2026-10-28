@@ -161,18 +161,18 @@ fn header_bar() -> impl WidgetView<EditorApp> {
     let cancel_btn = text_button("Cancel", |s: &mut EditorApp| {
         s.cancel();
     })
-    .border(BORDER, 1.0)
-    .corner_radius(4.0);
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0));
 
     let save_btn = text_button("Save", |s: &mut EditorApp| {
         s.save();
     })
     .background_color(ACCENT)
-    .corner_radius(4.0);
+    .corner_radius(Length::px(4.0));
 
     flex_row((title.flex(1.0), cancel_btn, save_btn))
         .gap(Length::px(8.))
-        .padding(12.0)
+        .padding(Length::px(12.0))
         .background_color(BG_HEADER)
 }
 
@@ -191,7 +191,7 @@ fn unsaved_row_warning() -> impl WidgetView<EditorApp> {
         s.force_save();
     })
     .background_color(ACCENT)
-    .corner_radius(4.0);
+    .corner_radius(Length::px(4.0));
 
     let discard_btn = text_button("Discard & Save", |s: &mut EditorApp| {
         if let EditorInner::Json(j) = &mut s.inner {
@@ -200,18 +200,18 @@ fn unsaved_row_warning() -> impl WidgetView<EditorApp> {
         }
         s.force_save();
     })
-    .border(BORDER, 1.0)
-    .corner_radius(4.0);
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0));
 
     let dismiss_btn = text_button("Go Back", |s: &mut EditorApp| {
         s.warn_unsaved_row = false;
     })
-    .border(BORDER, 1.0)
-    .corner_radius(4.0);
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0));
 
     flex_row((msg.flex(1.0), add_btn, discard_btn, dismiss_btn))
         .gap(Length::px(8.))
-        .padding(12.0)
+        .padding(Length::px(12.0))
         .background_color(WARN_BG)
 }
 
@@ -231,10 +231,10 @@ fn plain_text_body(content: String, masked: bool) -> impl WidgetView<EditorApp> 
             label(masked_label(&content))
                 .text_size(14.0)
                 .color(TEXT_MUTED)
-                .border(BORDER, 1.0)
-                .corner_radius(4.0)
+                .border(BORDER, Length::px(1.0))
+                .corner_radius(Length::px(4.0))
                 .background_color(BG_INPUT)
-                .padding(8.0),
+                .padding(Length::px(8.0)),
         )
     } else {
         Either::B(
@@ -246,8 +246,8 @@ fn plain_text_body(content: String, masked: bool) -> impl WidgetView<EditorApp> 
             .placeholder("Enter secret value…")
             .text_color(TEXT_PRIMARY)
             .text_size(14.0)
-            .border(BORDER, 1.0)
-            .corner_radius(4.0)
+            .border(BORDER, Length::px(1.0))
+            .corner_radius(Length::px(4.0))
             .background_color(BG_INPUT),
         )
     };
@@ -262,8 +262,8 @@ fn plain_text_body(content: String, masked: bool) -> impl WidgetView<EditorApp> 
             *masked = !*masked;
         }
     })
-    .border(BORDER, 1.0)
-    .corner_radius(4.0);
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0));
 
     let header = flex_row((
         label("Value").text_size(12.0).color(TEXT_MUTED).flex(1.0),
@@ -271,7 +271,7 @@ fn plain_text_body(content: String, masked: bool) -> impl WidgetView<EditorApp> 
     ))
     .gap(Length::px(8.));
 
-    flex_col((header, editor)).gap(Length::px(6.)).padding(16.0)
+    flex_col((header, editor)).gap(Length::px(6.)).padding(Length::px(16.0))
 }
 
 // ── JSON body ──
@@ -282,7 +282,7 @@ fn json_body(j: &mut JsonInner) -> Box<xilem::AnyWidgetView<EditorApp>> {
         label("Value").text_size(12.0).color(TEXT_MUTED),
     ))
     .gap(Length::px(12.))
-    .padding(12.0);
+    .padding(Length::px(12.0));
 
     let rows: Vec<Box<xilem::AnyWidgetView<EditorApp>>> = j
         .rows
@@ -316,8 +316,8 @@ fn kv_row(
         })
         .text_color(TEXT_PRIMARY)
         .text_size(14.0)
-        .border(BORDER, 1.0)
-        .corner_radius(4.0)
+        .border(BORDER, Length::px(1.0))
+        .corner_radius(Length::px(4.0))
         .background_color(BG_INPUT),
     )
     .fixed_width(Length::px(250.0));
@@ -327,10 +327,10 @@ fn kv_row(
             label(masked_label(&value))
                 .text_size(14.0)
                 .color(TEXT_MUTED)
-                .border(BORDER, 1.0)
-                .corner_radius(4.0)
+                .border(BORDER, Length::px(1.0))
+                .corner_radius(Length::px(4.0))
                 .background_color(BG_INPUT)
-                .padding(8.0),
+                .padding(Length::px(8.0)),
         )
     } else {
         Either::B(
@@ -341,8 +341,8 @@ fn kv_row(
             })
             .text_color(TEXT_PRIMARY)
             .text_size(14.0)
-            .border(BORDER, 1.0)
-            .corner_radius(4.0)
+            .border(BORDER, Length::px(1.0))
+            .corner_radius(Length::px(4.0))
             .background_color(BG_INPUT),
         )
     };
@@ -353,20 +353,20 @@ fn kv_row(
             j.rows[idx].masked = !j.rows[idx].masked;
         }
     })
-    .border(BORDER, 1.0)
-    .corner_radius(4.0);
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0));
 
     let remove_btn = text_button("❌", move |s: &mut EditorApp| {
         if let EditorInner::Json(j) = &mut s.inner {
             j.rows.remove(idx);
         }
     })
-    .border(BORDER, 1.0)
-    .corner_radius(4.0);
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0));
 
     flex_row((key_input, value_display.flex(1.0), mask_btn, remove_btn))
         .gap(Length::px(12.))
-        .padding(12.0)
+        .padding(Length::px(12.0))
         .background_color(BG_ROW)
         .boxed()
 }
@@ -381,8 +381,8 @@ fn new_kv_row(new_key: String, new_value: String) -> impl WidgetView<EditorApp> 
         .placeholder("VARIABLE_NAME")
         .text_color(TEXT_PRIMARY)
         .text_size(14.0)
-        .border(BORDER, 1.0)
-        .corner_radius(4.0)
+        .border(BORDER, Length::px(1.0))
+        .corner_radius(Length::px(4.0))
         .background_color(BG_INPUT),
     )
     .fixed_width(Length::px(250.0));
@@ -395,8 +395,8 @@ fn new_kv_row(new_key: String, new_value: String) -> impl WidgetView<EditorApp> 
     .placeholder("VARIABLE_VALUE")
     .text_color(TEXT_PRIMARY)
     .text_size(14.0)
-    .border(BORDER, 1.0)
-    .corner_radius(4.0)
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0))
     .background_color(BG_INPUT);
 
     let add_btn = text_button("➕", |s: &mut EditorApp| {
@@ -410,12 +410,12 @@ fn new_kv_row(new_key: String, new_value: String) -> impl WidgetView<EditorApp> 
             }
         }
     })
-    .border(BORDER, 1.0)
-    .corner_radius(4.0);
+    .border(BORDER, Length::px(1.0))
+    .corner_radius(Length::px(4.0));
 
     flex_row((key_input, value_input.flex(1.0), add_btn))
         .gap(Length::px(12.))
-        .padding(12.0)
+        .padding(Length::px(12.0))
 }
 
 // ── Public API ──
