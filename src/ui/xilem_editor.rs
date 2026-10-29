@@ -70,13 +70,14 @@ impl EditorApp {
 
     fn add_pending_row(&mut self) {
         if let EditorInner::Json(j) = &mut self.inner
-            && !j.new_key.is_empty() {
-                j.rows.push(KvRow {
-                    key: std::mem::take(&mut j.new_key),
-                    value: std::mem::take(&mut j.new_value),
-                    masked: true,
-                });
-            }
+            && !j.new_key.is_empty()
+        {
+            j.rows.push(KvRow {
+                key: std::mem::take(&mut j.new_key),
+                value: std::mem::take(&mut j.new_value),
+                masked: true,
+            });
+        }
     }
 
     fn force_save(&mut self) {
@@ -400,13 +401,14 @@ fn new_kv_row(new_key: String, new_value: String) -> impl WidgetView<EditorApp> 
 
     let add_btn = text_button("➕", |s: &mut EditorApp| {
         if let EditorInner::Json(j) = &mut s.inner
-            && !j.new_key.is_empty() {
-                j.rows.push(KvRow {
-                    key: std::mem::take(&mut j.new_key),
-                    value: std::mem::take(&mut j.new_value),
-                    masked: true,
-                });
-            }
+            && !j.new_key.is_empty()
+        {
+            j.rows.push(KvRow {
+                key: std::mem::take(&mut j.new_key),
+                value: std::mem::take(&mut j.new_value),
+                masked: true,
+            });
+        }
     })
     .border(BORDER, 1.0)
     .corner_radius(4.0);
