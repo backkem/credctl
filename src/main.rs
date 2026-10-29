@@ -68,12 +68,12 @@ async fn main() -> Result<()> {
 
 /// If the value is a JSON object with all-string values, treat it as structured.
 fn detect_kind(value: &str) -> store::SecretKind {
-    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(value) {
-        if map.values().all(|v| v.is_string()) {
-            let mut keys: Vec<String> = map.keys().cloned().collect();
-            keys.sort();
-            return store::SecretKind::Structured { keys };
-        }
+    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(value)
+        && map.values().all(|v| v.is_string())
+    {
+        let mut keys: Vec<String> = map.keys().cloned().collect();
+        keys.sort();
+        return store::SecretKind::Structured { keys };
     }
     store::SecretKind::PlainText
 }
