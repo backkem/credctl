@@ -271,7 +271,9 @@ fn plain_text_body(content: String, masked: bool) -> impl WidgetView<EditorApp> 
     ))
     .gap(Length::px(8.));
 
-    flex_col((header, editor)).gap(Length::px(6.)).padding(Length::px(16.0))
+    flex_col((header, editor))
+        .gap(Length::px(6.))
+        .padding(Length::px(16.0))
 }
 
 // ── JSON body ──

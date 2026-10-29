@@ -22,6 +22,14 @@ pub trait SecretEditor {
     fn edit(&self, kind: &SecretKind, current: Option<SecretValue>) -> Result<SecretValue>;
 }
 
+#[cfg(feature = "gui")]
 pub mod xilem_editor;
 
+#[cfg(feature = "gui")]
 pub use xilem_editor::XilemEditor;
+
+#[cfg(feature = "tui")]
+pub mod tui_editor;
+
+#[cfg(feature = "tui")]
+pub use tui_editor::TuiEditor;

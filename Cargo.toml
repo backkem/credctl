@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
+default = ["gui"]
 dev-store = []
+gui = ["dep:xilem"]
+tui = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
 anyhow = "1"
@@ -20,4 +23,7 @@ serde-envfile = "0.4"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 zeroize = { version = "1", features = ["derive"] }
 
-xilem = { git = "https://github.com/linebender/xilem", package = "xilem" }
+xilem = { git = "https://github.com/linebender/xilem", package = "xilem", optional = true }
+
+ratatui = { version = "0.30", optional = true }
+crossterm = { version = "0.29", optional = true }
